@@ -1,4 +1,5 @@
-# Moving Average Cross Buy/Sell Strategies (Pine Script v6)
+# TradingView README.md
+## Moving Average Cross Buy/Sell Strategies (Pine Script v6)
 
 This repository contains **two TradingView Pine Script strategy files** that implement simple moving‑average (SMA) cross systems with on‑chart labels, visual markers, and ready‑to‑use alert conditions:
 
