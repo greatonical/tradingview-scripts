@@ -1,0 +1,50 @@
+//@version=6
+strategy("Simple Auto Buy/Sell Strategy", overlay=true)
+
+// Define 2 Moving Averages
+shortMA = ta.sma(close, 10)
+longMA  = ta.sma(close, 30)
+
+// Plot them on the chart
+plot(shortMA, color=color.blue)
+plot(longMA,  color=color.red)
+
+// Entry condition: Short MA crosses above Long MA → Buy
+longCondition = ta.crossover(shortMA, longMA)
+if (longCondition)
+    strategy.entry("Long", strategy.long)
+    // show price label
+    label.new(bar_index, low, text="@" + str.tostring(close), 
+      style=label.style_label_up, color=color.green, textcolor=color.white, size=size.tiny)
+
+// Exit condition: Short MA crosses below Long MA → Sell
+shortCondition = ta.crossunder(shortMA, longMA)
+if (shortCondition)
+    strategy.close("Long")
+    // show price label
+    label.new(bar_index, high, text="@" + str.tostring(close), 
+      style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+
+// Plot buy/sell signals
+plotshape(series=longCondition,  
+     title="Buy Signal",       
+     location=location.belowbar, 
+     color=color.green,        
+     style=shape.labelup,      
+     size=size.small)
+
+plotshape(series=shortCondition, 
+     title="Sell Signal",      
+     location=location.abovebar, 
+     color=color.red,          
+     style=shape.labeldown,    
+     size=size.small)
+
+// === Alerts ===
+alertcondition(longCondition,
+     title="Go Long",
+     message="Go Long @ {{close}}")
+
+alertcondition(shortCondition,
+     title="Go Short",
+     message="Go Short @ {{close}}")

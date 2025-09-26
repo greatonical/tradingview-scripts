@@ -1,0 +1,46 @@
+//@version=6
+strategy("Advanced Buy/Sell Strategy", overlay=true)
+
+// === Moving Averages ===
+shortMA = ta.sma(close, 10)
+longMA  = ta.sma(close, 30)
+plot(shortMA, color=color.blue)
+plot(longMA,  color=color.red)
+
+// === Signal Conditions ===
+longCondition  = ta.crossover(shortMA, longMA)
+shortCondition = ta.crossunder(shortMA, longMA)
+
+// === Entries & Exits ===
+if (longCondition)
+    strategy.entry("Long", strategy.long)
+    strategy.close("Short")
+    // Buy label with price
+    label.new(bar_index, low, text="BUY @" + str.tostring(close), style=label.style_label_up, color=color.green, textcolor=color.white)
+
+if (shortCondition)
+    strategy.close("Long")
+    strategy.entry("Short", strategy.short)
+    // Short-entry label with price
+    label.new(bar_index, high, text="SHORT @" + str.tostring(close), style=label.style_label_down, color=color.orange, textcolor=color.white)
+
+// === Close Labels ===
+if (shortCondition)
+    // Close Long label with price
+    label.new(bar_index, low, text="CLOSE L @" + str.tostring(close), style=label.style_label_up, color=color.red, textcolor=color.white)
+
+if (longCondition)
+    // Close Short label with price
+    label.new(bar_index, high, text="CLOSE S @" + str.tostring(close), style=label.style_label_down, color=color.purple, textcolor=color.white)
+
+// === Plot Shapes (for visual markers) ===
+plotshape(longCondition,  title="Buy Signal",       location=location.belowbar, color=color.green,  style=shape.circle, size=size.small)
+plotshape(shortCondition, title="Sell/Close Long",   location=location.abovebar, color=color.red,    style=shape.cross,  size=size.small)
+plotshape(shortCondition, title="Short Entry Signal",location=location.belowbar, color=color.orange, style=shape.circle, size=size.small)
+plotshape(longCondition,  title="Close Short Signal",location=location.abovebar, color=color.purple, style=shape.cross,  size=size.small)
+
+// === Alerts ===
+alertcondition(longCondition,  title="Go Long",     message="Go Long @ {{close}}")
+alertcondition(shortCondition, title="Close Long",  message="Close Long @ {{close}}")
+alertcondition(shortCondition, title="Go Short",    message="Go Short @ {{close}}")
+alertcondition(longCondition,  title="Close Short", message="Close Short @ {{close}}")
