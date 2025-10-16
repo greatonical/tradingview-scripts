@@ -1,5 +1,9 @@
 # Confluence Trendwave
 
+Links: 
+Moving Confluence - [https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Moving Confluence.pine](https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Moving%20Confluence.pine)
+Normal Confluence - [https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Normal Confluence.pine](https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Normal%20Confluence.pine)
+
 ---
 
 ## **⚡ 1. Moving Confluence (Dynamic)**
