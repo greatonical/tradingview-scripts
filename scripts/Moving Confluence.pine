@@ -1,0 +1,176 @@
+//@version=6
+indicator("Moving Confluence Overlay (Dynamic, Tunable)", overlay=true, max_lines_count=300, max_labels_count=300)
+
+// ── Inputs
+emaFastLen  = input.int(9,  "EMA Fast",  minval=1)
+emaSlowLen  = input.int(21, "EMA Slow",  minval=1)
+emaBaseLen  = input.int(200,"EMA Base",  minval=1)
+
+rsiLen      = input.int(14, "RSI Length", minval=1, group="StochRSI")
+kLen        = input.int(14, "Stoch K",    minval=1, group="StochRSI")
+dLen        = input.int(3,  "Stoch D",    minval=1, group="StochRSI")
+obLevel     = input.float(80, "OB", minval=0, maxval=100, group="StochRSI")
+osLevel     = input.float(20, "OS", minval=0, maxval=100, group="StochRSI")
+
+macdFast    = input.int(12, "MACD Fast", minval=1, group="MACD")
+macdSlow    = input.int(26, "MACD Slow", minval=1, group="MACD")
+macdSig     = input.int(9,  "MACD Signal", minval=1, group="MACD")
+
+atrLen      = input.int(14, "ATR Length", minval=1, group="Volatility")
+atrSpikeX   = input.float(1.75, "ATR Spike × Avg ATR", minval=1, group="Volatility")
+
+showMAs     = input.bool(true, "Show EMA 50/200", group="Extra MAs")
+ema50Len    = input.int(50, "EMA 50", group="Extra MAs")
+ema200Len   = input.int(200,"EMA 200", group="Extra MAs")
+
+// ── Signal behavior controls
+debounceBars   = input.int(1,   "Debounce bars (0 = off)", minval=0, maxval=5, group="Signal Controls")
+lookbackBars   = input.int(500, "Paint signals in last N bars", minval=50, step=50, group="Signal Controls")
+showDebug      = input.bool(false, "Show raw condition debug markers", group="Signal Controls")
+
+// ── Trade level inputs (unchanged)
+showTargets = input.bool(true, "Show Entry/Stop & 5 Targets", group="Trade Levels")
+useManual   = input.bool(false,"Set Entry/Stop manually?", group="Trade Levels")
+entryInput  = input.float(0.0,  "Manual Entry (0=close)", minval=0, group="Trade Levels")
+stopInput   = input.float(0.0,  "Manual Stop (0=none)",   minval=0, group="Trade Levels")
+tpPct1      = input.float(0.25, "TP1 %", step=0.01, group="Trade Levels")
+tpPct2      = input.float(0.50, "TP2 %", step=0.01, group="Trade Levels")
+tpPct3      = input.float(0.75, "TP3 %", step=0.01, group="Trade Levels")
+tpPct4      = input.float(1.00, "TP4 %", step=0.01, group="Trade Levels")
+tpPct5      = input.float(1.25, "TP5 %", step=0.01, group="Trade Levels")
+
+// ── Core MAs / Ribbon
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+emaBase = ta.ema(close, emaBaseLen)
+ribbonBull = emaFast > emaSlow
+
+colBull = color.new(color.teal, 0)
+colBear = color.new(color.rgb(128, 0, 0), 0)
+
+pFast = plot(emaFast, "EMA Fast", color=ribbonBull ? colBull : colBear, linewidth=2)
+pSlow = plot(emaSlow, "EMA Slow", color=ribbonBull ? color.new(colBull, 50) : color.new(colBear, 50), linewidth=2)
+fill(pFast, pSlow, color=ribbonBull ? color.new(colBull, 80) : color.new(colBear, 80))
+
+ema50  = ta.ema(close, ema50Len)
+ema200 = ta.ema(close, ema200Len)
+plot(showMAs ? ema50  : na, "EMA 50",  color=color.fuchsia)
+plot(showMAs ? ema200 : na, "EMA 200", color=color.purple)
+
+// ── StochRSI
+rsi_src = ta.rsi(close, rsiLen)
+k = ta.sma(ta.stoch(rsi_src, rsi_src, rsi_src, kLen), 1)
+d = ta.sma(k, dLen)
+kOB = k > obLevel
+kOS = k < osLevel
+kCrossUp = ta.crossover(k, d)
+kCrossDn = ta.crossunder(k, d)
+
+// ── MACD
+macdLine  = ta.ema(close, macdFast) - ta.ema(close, macdSlow)
+macdSigLn = ta.ema(macdLine, macdSig)
+macdHist  = macdLine - macdSigLn
+momUp     = macdHist > 0 and macdLine > macdSigLn
+momDn     = macdHist < 0 and macdLine < macdSigLn
+
+// ── Volatility
+atr = ta.atr(atrLen)
+atrAvg = ta.sma(atr, atrLen)
+atrSpike = atr > atrSpikeX * atrAvg
+
+// ── Confluence raw conditions
+longRaw  = ribbonBull and momUp  and (kCrossUp or (kOS and k > d))
+shortRaw = (not ribbonBull) and momDn and (kCrossDn or (kOB and k < d))
+
+// ── Debounce logic (configurable)
+debounceOK(cond) =>
+    // true if cond has been true for (debounceBars+1) consecutive bars (including current)
+    debounceBars == 0 ? cond : (cond and ta.barssince(not cond) > debounceBars - 1)
+
+longCond  = debounceOK(longRaw)
+shortCond = debounceOK(shortRaw)
+
+// ── Restrict plotting to recent N bars (avoid spamming / label limits)
+var int lastIdx = na
+if barstate.islast
+    lastIdx := bar_index
+withinLookback = na(lastIdx) ? true : (lastIdx - bar_index <= lookbackBars)
+
+// ── Labels (only for recent bars)
+if longCond and withinLookback
+    label.new(bar_index, low, "LONG", xloc=xloc.bar_index, yloc=yloc.belowbar,
+      textcolor=color.white, style=label.style_label_up, color=colBull)
+
+if shortCond and withinLookback
+    label.new(bar_index, high, "SHORT", xloc=xloc.bar_index, yloc=yloc.abovebar,
+      textcolor=color.white, style=label.style_label_down, color=colBear)
+
+// ── Debug (optional): show where raw conditions fire
+plotshape(showDebug and longRaw,  title="longRaw",  style=shape.circle, location=location.belowbar, size=size.tiny, color=color.new(color.aqua, 0))
+plotshape(showDebug and shortRaw, title="shortRaw", style=shape.circle, location=location.abovebar, size=size.tiny, color=color.new(color.red, 0))
+
+// ── Markers (info)
+plotshape(atrSpike and withinLookback, title="Lightning", style=shape.flag, location=location.abovebar, size=size.tiny, color=color.orange, text="⚡")
+
+// ── Trade levels (dynamic, last-bar only)
+var line lnEntry = na
+var line lnStop  = na
+var line lnTP1   = na
+var line lnTP2   = na
+var line lnTP3   = na
+var line lnTP4   = na
+var line lnTP5   = na
+
+var label labEntry = na
+var label labStop  = na
+var label labTP1   = na
+var label labTP2   = na
+var label labTP3   = na
+var label labTP4   = na
+var label labTP5   = na
+
+_e = useManual and entryInput > 0 ? entryInput : close
+_s = useManual and stopInput  > 0 ? stopInput  : na
+
+targetPercToPrice(_entry, _pct) =>
+    dirUp = close >= _entry
+    _entry * (dirUp ? (1 + _pct/100.0) : (1 - _pct/100.0))
+
+p1 = targetPercToPrice(_e, tpPct1)
+p2 = targetPercToPrice(_e, tpPct2)
+p3 = targetPercToPrice(_e, tpPct3)
+p4 = targetPercToPrice(_e, tpPct4)
+p5 = targetPercToPrice(_e, tpPct5)
+
+drawHoriz(_oldLine, _y, _c) =>
+    if not na(_oldLine)
+        line.delete(_oldLine)
+    line.new(bar_index, _y, bar_index, _y, xloc=xloc.bar_index, extend=extend.right, color=_c, width=2)
+
+drawLab(_oldLab, _txt, _y, _c) =>
+    if not na(_oldLab)
+        label.delete(_oldLab)
+    label.new(bar_index + 1, _y, _txt, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, textcolor=color.white, color=_c)
+
+if showTargets and barstate.islast
+    lnEntry := drawHoriz(lnEntry, _e, color.new(color.blue, 0))
+    labEntry := drawLab(labEntry, "Entry: " + str.tostring(_e, format.mintick), _e, color.new(color.blue, 0))
+
+    if not na(_s)
+        lnStop := drawHoriz(lnStop, _s, color.new(color.red, 0))
+        labStop := drawLab(labStop, "Invalidation: " + str.tostring(_s, format.mintick), _s, color.new(color.red, 0))
+
+    lnTP1 := drawHoriz(lnTP1, p1, color.new(color.orange, 0))
+    labTP1 := drawLab(labTP1, "Exit 1: " + str.tostring(p1, format.mintick), p1, color.new(color.orange, 0))
+
+    lnTP2 := drawHoriz(lnTP2, p2, color.new(color.orange, 10))
+    labTP2 := drawLab(labTP2, "Exit 2: " + str.tostring(p2, format.mintick), p2, color.new(color.orange, 10))
+
+    lnTP3 := drawHoriz(lnTP3, p3, color.new(color.orange, 20))
+    labTP3 := drawLab(labTP3, "Exit 3: " + str.tostring(p3, format.mintick), p3, color.new(color.orange, 20))
+
+    lnTP4 := drawHoriz(lnTP4, p4, color.new(color.orange, 30))
+    labTP4 := drawLab(labTP4, "Exit 4: " + str.tostring(p4, format.mintick), p4, color.new(color.orange, 30))
+
+    lnTP5 := drawHoriz(lnTP5, p5, color.new(color.orange, 40))
+    labTP5 := drawLab(labTP5, "Exit 5: " + str.tostring(p5, format.mintick), p5, color.new(color.orange, 40))
