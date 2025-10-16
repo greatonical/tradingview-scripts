@@ -1,0 +1,62 @@
+//@version=5
+indicator("Momentum Suite (MACD + StochRSI)", overlay=false, max_labels_count=500)
+
+// ======================
+// Toggles
+// ======================
+showMACD  = input.bool(true,  "Show MACD Histogram + Lines")
+showStoch = input.bool(true,  "Show Stochastic RSI Panel")
+showStochConfirm = input.bool(true, "Show StochRSI confirm bars")
+
+// ======================
+// MACD (Histogram + Lines)
+// ======================
+macdFast = input.int(12, "MACD Fast EMA", minval=1, inline="macd")
+macdSlow = input.int(26, "Slow EMA",      minval=1, inline="macd")
+macdSig  = input.int(9,  "Signal EMA",    minval=1, inline="macd")
+
+macdLine  = ta.ema(close, macdFast) - ta.ema(close, macdSlow)
+signal    = ta.ema(macdLine, macdSig)
+hist      = macdLine - signal
+
+// zero line for MACD
+hZero = hline(0, "Zero", color=color.new(color.gray, 75), display = showMACD ? display.all : display.none)
+
+// MACD plots (hidden if toggle off by feeding na)
+macdCol = hist >= 0 ? color.new(color.lime, 0) : color.new(color.red, 0)
+plot(showMACD ? hist     : na, title="MACD Histogram", style=plot.style_columns, color=macdCol)
+plot(showMACD ? macdLine : na, title="MACD Line",      color=color.new(color.white, 30))
+plot(showMACD ? signal   : na, title="Signal Line",    color=color.new(color.yellow, 30))
+
+// ======================
+// Stochastic RSI
+// ======================
+rsiLen = input.int(14, "RSI Length", minval=1, inline="st")
+kLen   = input.int(14, "Stoch K",    minval=1, inline="st")
+dLen   = input.int(3,  "Stoch D",    minval=1, inline="st")
+ob     = input.float(80, "OB", minval=0, maxval=100, inline="st2")
+os     = input.float(20, "OS", minval=0, maxval=100, inline="st2")
+
+rsi_src = ta.rsi(close, rsiLen)
+k = ta.sma(ta.stoch(rsi_src, rsi_src, rsi_src, kLen), 1)
+d = ta.sma(k, dLen)
+
+// OB/OS lines (use display to hide when toggle off)
+hOB  = hline(ob,  "OB",  color=color.new(color.red, 60),  display = showStoch ? display.all : display.none)
+hOS  = hline(os,  "OS",  color=color.new(color.lime, 60), display = showStoch ? display.all : display.none)
+hMid = hline(50,  "Mid", color=color.new(color.gray, 80), display = showStoch ? display.all : display.none)
+
+// Stoch plots
+plot(showStoch ? k : na, title="StochRSI %K", color=color.new(color.red, 0),   linewidth=2)
+plot(showStoch ? d : na, title="StochRSI %D", color=color.new(color.green, 0), linewidth=2)
+
+// Extreme markers & confirm bars
+extremeOB = showStoch and k > ob and d > ob
+extremeOS = showStoch and k < os and d < os
+plotshape(extremeOB, title="OB Marker", style=shape.square, size=size.tiny, color=color.red,  location=location.top)
+plotshape(extremeOS, title="OS Marker", style=shape.square, size=size.tiny, color=color.lime, location=location.bottom)
+
+confirmLong  = showStoch and (ta.crossover(k, d) or (k > d and ta.rising(k, 2)))
+confirmShort = showStoch and (ta.crossunder(k, d) or (k < d and ta.falling(k, 2)))
+plot(showStoch and showStochConfirm ? 5  : na, title="Stoch Long Confirms",  style=plot.style_columns, color=color.new(color.lime, 0))
+plot(showStoch and showStochConfirm ? -5 : na, title="Stoch Short Confirms", style=plot.style_columns, color=color.new(color.red, 10))

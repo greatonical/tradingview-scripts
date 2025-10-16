@@ -3,7 +3,7 @@
 Links: 
 Moving Confluence - [https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Moving Confluence.pine](https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Moving%20Confluence.pine)
 Normal Confluence - [https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Normal Confluence.pine](https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Normal%20Confluence.pine)
-
+Momentum Suite (Open in a new window in TradingView and used with either confluence) - [https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Momentum-sUITE.pine](https://github.com/greatonical/tradingview-scripts/blob/main/scripts/Momentum-Suite.pine)
 ---
 
 ## **⚡ 1. Moving Confluence (Dynamic)**
